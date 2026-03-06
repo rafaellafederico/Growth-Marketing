@@ -123,6 +123,17 @@
     .td-name { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
     .td-num { text-align: right; font-variant-numeric: tabular-nums; }
     .good-num { color: var(--green); } .warn-num { color: var(--yellow); } .bad-num { color: var(--red); }
+
+    /* MULTI-ACCOUNT */
+    .accounts-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+    .account-row { display: flex; gap: 6px; align-items: center; }
+    .account-row input { width: 220px; }
+    .account-row .acc-label { font-size: 11px; color: var(--muted); width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-remove { background: var(--surface2); border: 1px solid var(--border); color: var(--red); padding: 5px 9px; border-radius: 7px; cursor: pointer; font-size: 13px; line-height: 1; }
+    .btn-remove:hover { background: #3a1a1a; }
+    .btn-add { background: var(--surface2); border: 1px dashed var(--border); color: var(--accent2); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: 12px; margin-top: 4px; }
+    .btn-add:hover { border-color: var(--accent2); }
+    .acc-tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
   </style>
 </head>
 <body>
@@ -142,8 +153,9 @@
       <input type="text" id="cfg-token" placeholder="EAAxxxxxxxxxxxxxxxx" />
     </div>
     <div class="config-field">
-      <label>Ad Account ID</label>
-      <input type="text" id="cfg-account" placeholder="act_123456789" />
+      <label>Ad Accounts</label>
+      <div class="accounts-list" id="accounts-list"></div>
+      <button class="btn-add" onclick="addAccountRow()">+ Adicionar conta</button>
     </div>
     <div class="config-field">
       <label>De</label>
@@ -215,7 +227,7 @@
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>#</th><th>Formato</th><th>Criativo</th>
+          <th>#</th><th>Conta</th><th>Formato</th><th>Criativo</th>
           <th class="td-num">Compras</th><th class="td-num">Spend</th><th class="td-num">Receita</th>
           <th class="td-num">CAC</th><th class="td-num">ROI</th><th class="td-num">ROAS</th>
           <th class="td-num">Hook%</th><th class="td-num">CTR%</th>
@@ -277,74 +289,137 @@ function prevMonth() {
   return [fmt(firstPrev), fmt(lastPrev)];
 }
 
+// ── ACCOUNTS LIST ─────────────────────────────────────────────────────────────
+function addAccountRow(id = '', label = '') {
+  const list = $('accounts-list');
+  const idx = list.children.length;
+  const row = document.createElement('div');
+  row.className = 'account-row';
+  row.innerHTML = `
+    <input type="text" class="acc-input" placeholder="act_123456789 ou só o número" value="${id}" oninput="saveAccounts()" />
+    <input type="text" class="acc-label-input" placeholder="Nome (opcional)" style="width:130px" value="${label}" oninput="saveAccounts()" />
+    <button class="btn-remove" onclick="this.parentElement.remove();saveAccounts()">×</button>`;
+  list.appendChild(row);
+}
+
+function getAccounts() {
+  return Array.from(document.querySelectorAll('.acc-input'))
+    .map((el, i) => {
+      const raw = el.value.trim();
+      if (!raw) return null;
+      const id = raw.startsWith('act_') ? raw : 'act_' + raw;
+      const labelEl = el.parentElement.querySelector('.acc-label-input');
+      const label = labelEl?.value.trim() || id;
+      return { id, label };
+    }).filter(Boolean);
+}
+
+function saveAccounts() {
+  const accounts = getAccounts().map(a => ({ id: a.id, label: a.label }));
+  localStorage.setItem('meta_accounts', JSON.stringify(accounts));
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 (function init() {
   const [s, u] = prevMonth();
   $('cfg-since').value = s;
   $('cfg-until').value = u;
-  // restore saved token/account
   $('cfg-token').value = localStorage.getItem('meta_token') || '';
-  $('cfg-account').value = localStorage.getItem('meta_account') || '';
+
+  const saved = JSON.parse(localStorage.getItem('meta_accounts') || '[]');
+  if (saved.length) {
+    saved.forEach(a => addAccountRow(a.id, a.label));
+  } else {
+    addAccountRow();
+  }
 })();
+
+// ── FETCH ONE ACCOUNT ─────────────────────────────────────────────────────────
+async function fetchAccount(token, account, since, until, limit) {
+  const fields = [
+    'ad_id','ad_name','spend','impressions','reach','actions','action_values',
+    'purchase_roas','video_p25_watched_actions','video_thruplay_watched_actions',
+    'inline_link_clicks','ctr'
+  ].join(',');
+
+  const url = new URL(`https://graph.facebook.com/v19.0/${account}/insights`);
+  url.searchParams.set('access_token', token);
+  url.searchParams.set('level', 'ad');
+  url.searchParams.set('time_range', JSON.stringify({since, until}));
+  url.searchParams.set('fields', fields);
+  url.searchParams.set('sort', 'spend_descending');
+  url.searchParams.set('limit', limit);
+
+  const res = await fetch(url);
+  const json = await res.json();
+  if (json.error) throw new Error(`[${account}] ${json.error.message}`);
+  return json.data || [];
+}
 
 // ── LOAD ──────────────────────────────────────────────────────────────────────
 async function load() {
   const token = $('cfg-token').value.trim();
-  const rawAccount = $('cfg-account').value.trim();
-  const account = rawAccount.startsWith('act_') ? rawAccount : 'act_' + rawAccount;
+  const accounts = getAccounts();
   const since = $('cfg-since').value;
   const until = $('cfg-until').value;
   const limit = $('cfg-limit').value;
 
-  if (!token || !account) {
-    alert('Preencha o Access Token e o Ad Account ID primeiro.');
-    return;
-  }
+  if (!token) { alert('Preencha o Access Token.'); return; }
+  if (!accounts.length) { alert('Adicione pelo menos uma Ad Account.'); return; }
 
   localStorage.setItem('meta_token', token);
-  localStorage.setItem('meta_account', account);
+  saveAccounts();
 
   $('content').style.display = 'none';
   $('state-msg').style.display = 'block';
   $('state-msg').className = '';
-  $('state-msg').textContent = '⏳ Buscando dados da Meta Ads API…';
+  $('state-msg').textContent = `⏳ Buscando ${accounts.length} conta(s) em paralelo…`;
 
   try {
-    const fields = [
-      'ad_id','ad_name','spend','impressions','reach','actions','action_values',
-      'purchase_roas','video_p25_watched_actions','video_thruplay_watched_actions',
-      'inline_link_clicks','ctr'
-    ].join(',');
+    const results = await Promise.allSettled(
+      accounts.map(a => fetchAccount(token, a.id, since, until, limit))
+    );
 
-    const url = new URL(`https://graph.facebook.com/v19.0/${account}/insights`);
-    url.searchParams.set('access_token', token);
-    url.searchParams.set('level', 'ad');
-    url.searchParams.set('time_range', JSON.stringify({since, until}));
-    url.searchParams.set('fields', fields);
-    url.searchParams.set('sort', 'spend_descending');
-    url.searchParams.set('limit', limit);
+    const errors = [];
+    let allAds = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        r.value.forEach(ad => { ad._account_label = accounts[i].label; });
+        allAds = allAds.concat(r.value);
+      } else {
+        errors.push(r.reason?.message || accounts[i].id);
+      }
+    });
 
-    const res = await fetch(url);
-    const json = await res.json();
+    if (errors.length) console.warn('Erros em algumas contas:', errors);
 
-    if (json.error) throw new Error(json.error.message);
-
-    const rawAds = json.data || [];
-    if (!rawAds.length) {
-      $('state-msg').textContent = '⚠ Nenhum criativo encontrado para o período.';
+    if (!allAds.length) {
+      $('state-msg').textContent = errors.length
+        ? '❌ Erro: ' + errors.join(' | ')
+        : '⚠ Nenhum criativo encontrado para o período.';
       return;
     }
 
-    const creatives = rawAds.map(ad => ({
+    const creatives = allAds.map(ad => ({
       ad_id: ad.ad_id,
       ad_name: ad.ad_name || ad.ad_id,
+      account: ad._account_label,
       format: classifyFormat(ad.ad_name || ''),
       metrics: calcMetrics(ad),
     }));
 
-    render(creatives, since, until);
-    $('state-msg').style.display = 'none';
+    if (errors.length) {
+      $('state-msg').style.display = 'block';
+      $('state-msg').className = 'error';
+      $('state-msg').style.fontSize = '12px';
+      $('state-msg').textContent = `⚠ ${errors.length} conta(s) com erro: ${errors.join(' | ')}`;
+      setTimeout(() => { $('state-msg').style.display = 'none'; }, 6000);
+    } else {
+      $('state-msg').style.display = 'none';
+    }
+
     $('content').style.display = 'block';
+    render(creatives, since, until);
 
   } catch(e) {
     $('state-msg').className = 'error';
@@ -493,6 +568,7 @@ function render(creatives, since, until) {
     tbody.innerHTML += `
       <tr>
         <td style="color:var(--muted)">${i+1}</td>
+        <td><span class="acc-tag" title="${c.account||''}">${(c.account||'').substring(0,14)}</span></td>
         <td><span class="pill ${FMT_BADGE[c.format]||'badge-OUTROS'}">${c.format}</span></td>
         <td class="td-name" title="${c.ad_name}">${c.ad_name}</td>
         <td class="td-num">${m.purchases.toFixed(0)}</td>
