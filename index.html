@@ -300,7 +300,7 @@
       <div class="collab-grid" id="collab-grid"></div>
     </div>
 
-    <div class="section-title">Todos os Criativos</div>
+    <div class="section-title">Todos os Criativos <button onclick="exportCSV()" style="margin-left:8px;font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--fg);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:600">⬇ Exportar CSV</button></div>
     <div class="table-wrap">
       <table>
         <thead><tr>
@@ -500,16 +500,17 @@ async function fetchAccount(token, account, since, until, limit) {
       const ids = rows.map(r => r.ad_id).join(',');
       const cUrl = new URL('https://graph.facebook.com/v19.0/');
       cUrl.searchParams.set('ids', ids);
-      cUrl.searchParams.set('fields', 'creative{thumbnail_url,video_id,object_type}');
+      cUrl.searchParams.set('fields', 'creative{thumbnail_url,video_id,object_type,instagram_permalink_url}');
       cUrl.searchParams.set('access_token', token);
       const cRes = await fetch(cUrl);
       const cJson = await cRes.json();
       if (!cJson.error) {
         rows.forEach(r => {
           const info = cJson[r.ad_id]?.creative || {};
-          r._thumbnail = info.thumbnail_url || '';
-          r._video_id  = info.video_id || '';
-          r._obj_type  = info.object_type || '';
+          r._thumbnail      = info.thumbnail_url || '';
+          r._video_id       = info.video_id || '';
+          r._obj_type       = info.object_type || '';
+          r._ig_permalink   = info.instagram_permalink_url || '';
         });
       }
     } catch(_) { /* creative info optional */ }
@@ -569,8 +570,9 @@ async function load() {
       account: ad._account_label,
       format: classifyFormat(ad.ad_name || ''),
       metrics: calcMetrics(ad),
-      thumbnail: ad._thumbnail || '',
-      video_id: ad._video_id || '',
+      thumbnail:    ad._thumbnail || '',
+      video_id:     ad._video_id || '',
+      ig_permalink: ad._ig_permalink || '',
       token: ad._account_token || '',
     }));
 
@@ -630,9 +632,10 @@ async function openVideoModal(c) {
   body.innerHTML = '<span style="color:var(--muted);font-size:12px;font-style:italic">⏳ Carregando prévia…</span>';
   $('video-modal').classList.add('open');
 
-  const fallbackLink = c.video_id
+  const fallbackLink = c.ig_permalink || (c.video_id
     ? `https://www.facebook.com/video/${c.video_id}`
-    : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`;
+    : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`);
+  const igLink = c.ig_permalink || null;
 
   // Try Ad Preview API first — returns official Meta iframe (no CORS issues)
   if (c.token && c.ad_id) {
@@ -647,20 +650,21 @@ async function openVideoModal(c) {
         // Resize iframe to fit modal
         const sized = decoded.replace(/width=["']?\d+["']?/,'width="100%"').replace(/height=["']?\d+["']?/,'height="500"');
         body.innerHTML = `<div style="width:100%;min-height:300px">${sized}</div>`;
-        $('vid-modal-foot').innerHTML = `<a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:11px">Abrir no Facebook ↗</a>`;
+        $('vid-modal-foot').innerHTML = (igLink ? `<a href="${igLink}" target="_blank" rel="noopener" style="color:#e1306c;font-size:11px;font-weight:600">📲 Ver no Instagram ↗</a>` : '') +
+          `<a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:11px;margin-left:12px">Abrir no Facebook ↗</a>`;
         return;
       }
     } catch(_) { /* fall through */ }
   }
 
   // Fallback: show thumbnail lightbox
+  const igBtn = igLink ? `<a href="${igLink}" target="_blank" rel="noopener" style="color:#e1306c;font-weight:600">📲 Ver no Instagram com comentários ↗</a>` : '';
+  const fbBtn = `<a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2)">Abrir no Facebook ↗</a>`;
   body.innerHTML = c.thumbnail
     ? `<img src="${c.thumbnail}" style="width:100%;border-radius:8px;border:1px solid var(--border)" />
-       <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Prévia não disponível.
-         <a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2)">Abrir no Facebook ↗</a></p>`
-    : `<p style="font-size:12px;color:var(--muted);text-align:center">
-         Sem prévia disponível.
-         <a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2)">Abrir no Ads Manager ↗</a></p>`;
+       <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center;display:flex;gap:16px;justify-content:center;flex-wrap:wrap">${igBtn}${fbBtn}</p>`
+    : `<p style="font-size:12px;color:var(--muted);text-align:center;display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+         Sem prévia disponível. ${igBtn}${fbBtn}</p>`;
 }
 
 // ── SCRIPT MODAL ──────────────────────────────────────────────────────────────
@@ -971,9 +975,9 @@ function render(creatives, since, until) {
     const m = c.metrics;
     const roiClass = m.roi==null?'':m.roi>=100?'good-num':m.roi>=0?'warn-num':'bad-num';
     const cacClass = m.cac==null?'':overallCac&&m.cac<overallCac*0.8?'good-num':overallCac&&m.cac>overallCac*1.3?'bad-num':'';
-    const videoHref = c.video_id
+    const videoHref = c.ig_permalink || (c.video_id
       ? `https://www.facebook.com/video/${c.video_id}`
-      : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`;
+      : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`);
     const previewCell = c.thumbnail
       ? `<button onclick="openVideoModal(_creatives[${i}])" class="thumb-play" title="Assistir vídeo">
            <img src="${c.thumbnail}" />
@@ -1002,6 +1006,32 @@ function render(creatives, since, until) {
       </tr>`;
   });
   window._creatives = creatives;
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const creatives = window._creatives;
+  if (!creatives?.length) { alert('Carregue os dados primeiro.'); return; }
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = ['#','Conta','Formato','Criativo','Compras','Spend (R$)','Receita (R$)','CAC (R$)','ROI (%)','ROAS','Hook Rate (%)','CTR (%)','Recomendação','Link Instagram','Link Facebook'];
+  const rows = creatives.map((c, i) => {
+    const m = c.metrics;
+    const rec = adRec(c, window._overallCac);
+    const igLink = c.ig_permalink || '';
+    const fbLink = c.video_id ? `https://www.facebook.com/video/${c.video_id}` : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`;
+    return [
+      i+1, c.account||'', c.format, c.ad_name,
+      m.purchases, m.spend.toFixed(2), m.purchaseValue.toFixed(2),
+      m.cac ?? '', m.roi ?? '', m.roas ?? '',
+      m.hookRate ?? '', m.ctr,
+      rec.label, igLink, fbLink
+    ].map(esc).join(',');
+  });
+  const csv = '\uFEFF' + [headers.map(esc).join(','), ...rows].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `criativos_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
 }
 </script>
 </body>
