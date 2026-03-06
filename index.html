@@ -148,9 +148,10 @@
 <div id="config-panel">
   <h2>Configuração</h2>
   <div class="config-row">
-    <div class="config-field">
-      <label>Token padrão (Meta)</label>
-      <input type="text" id="cfg-token" placeholder="EAAxxxxxxxxxxxxxxxx — usado quando a conta não tem token próprio" style="width:340px" />
+    <div class="config-field" style="flex-basis:100%">
+      <label>Tokens / Business Managers</label>
+      <div class="accounts-list" id="tokens-list"></div>
+      <button class="btn-add" onclick="addTokenRow()">+ Adicionar token</button>
     </div>
     <div class="config-field" style="flex-basis:100%">
       <label>Ad Accounts</label>
@@ -289,35 +290,79 @@ function prevMonth() {
   return [fmt(firstPrev), fmt(lastPrev)];
 }
 
-// ── ACCOUNTS LIST ─────────────────────────────────────────────────────────────
-function addAccountRow(id = '', label = '', token = '') {
-  const list = $('accounts-list');
+// ── TOKENS LIST ───────────────────────────────────────────────────────────────
+function addTokenRow(label = '', value = '') {
+  const list = $('tokens-list');
   const row = document.createElement('div');
   row.className = 'account-row';
   row.innerHTML = `
+    <input type="text" class="tok-label-input" placeholder="Nome da BM (ex: BM Principal)" style="width:150px" value="${label}" oninput="saveTokens();refreshTokenSelects()" />
+    <input type="text" class="tok-value-input" placeholder="EAAxxxxxxxxxxxxxxxx" style="width:300px" value="${value}" oninput="saveTokens();refreshTokenSelects()" />
+    <button class="btn-remove" onclick="this.parentElement.remove();saveTokens();refreshTokenSelects()">×</button>`;
+  list.appendChild(row);
+  refreshTokenSelects();
+}
+
+function getTokens() {
+  return Array.from(document.querySelectorAll('.tok-label-input'))
+    .map(el => {
+      const label = el.value.trim();
+      const val = el.parentElement.querySelector('.tok-value-input')?.value.trim() || '';
+      if (!val) return null;
+      return { label: label || val.slice(0, 12) + '…', value: val };
+    }).filter(Boolean);
+}
+
+function saveTokens() {
+  localStorage.setItem('meta_tokens', JSON.stringify(getTokens()));
+}
+
+function refreshTokenSelects() {
+  const tokens = getTokens();
+  document.querySelectorAll('.acc-token-select').forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = tokens.map(t =>
+      `<option value="${t.label}" ${t.label === current ? 'selected' : ''}>${t.label}</option>`
+    ).join('') || '<option value="">— sem tokens —</option>';
+  });
+}
+
+// ── ACCOUNTS LIST ─────────────────────────────────────────────────────────────
+function addAccountRow(id = '', label = '', tokenLabel = '') {
+  const list = $('accounts-list');
+  const row = document.createElement('div');
+  row.className = 'account-row';
+  const tokens = getTokens();
+  const opts = tokens.map(t =>
+    `<option value="${t.label}" ${t.label === tokenLabel ? 'selected' : ''}>${t.label}</option>`
+  ).join('') || '<option value="">— sem tokens —</option>';
+  row.innerHTML = `
     <input type="text" class="acc-input" placeholder="act_123456789 ou só o número" value="${id}" oninput="saveAccounts()" />
     <input type="text" class="acc-label-input" placeholder="Nome (ex: Marca A)" style="width:120px" value="${label}" oninput="saveAccounts()" />
-    <input type="text" class="acc-token-input" placeholder="Token próprio (opcional)" style="width:200px" value="${token}" oninput="saveAccounts()" />
+    <select class="acc-token-select" onchange="saveAccounts()" style="height:32px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--fg);padding:0 8px">${opts}</select>
     <button class="btn-remove" onclick="this.parentElement.remove();saveAccounts()">×</button>`;
   list.appendChild(row);
 }
 
 function getAccounts() {
+  const tokens = getTokens();
   return Array.from(document.querySelectorAll('.acc-input'))
     .map(el => {
       const raw = el.value.trim();
       if (!raw) return null;
       const id = raw.startsWith('act_') ? raw : 'act_' + raw;
       const labelEl = el.parentElement.querySelector('.acc-label-input');
-      const tokenEl = el.parentElement.querySelector('.acc-token-input');
+      const sel = el.parentElement.querySelector('.acc-token-select');
       const label = labelEl?.value.trim() || id;
-      const token = tokenEl?.value.trim() || '';
-      return { id, label, token };
+      const tokenLabel = sel?.value || '';
+      const found = tokens.find(t => t.label === tokenLabel);
+      const token = found?.value || tokens[0]?.value || '';
+      return { id, label, tokenLabel, token };
     }).filter(Boolean);
 }
 
 function saveAccounts() {
-  const accounts = getAccounts().map(a => ({ id: a.id, label: a.label }));
+  const accounts = getAccounts().map(a => ({ id: a.id, label: a.label, tokenLabel: a.tokenLabel }));
   localStorage.setItem('meta_accounts', JSON.stringify(accounts));
 }
 
@@ -326,11 +371,22 @@ function saveAccounts() {
   const [s, u] = prevMonth();
   $('cfg-since').value = s;
   $('cfg-until').value = u;
-  $('cfg-token').value = localStorage.getItem('meta_token') || '';
+
+  // migrate legacy single token
+  const legacy = localStorage.getItem('meta_token');
+
+  const savedTokens = JSON.parse(localStorage.getItem('meta_tokens') || '[]');
+  if (savedTokens.length) {
+    savedTokens.forEach(t => addTokenRow(t.label, t.value));
+  } else if (legacy) {
+    addTokenRow('Token 1', legacy);
+  } else {
+    addTokenRow();
+  }
 
   const saved = JSON.parse(localStorage.getItem('meta_accounts') || '[]');
   if (saved.length) {
-    saved.forEach(a => addAccountRow(a.id, a.label, a.token || ''));
+    saved.forEach(a => addAccountRow(a.id, a.label, a.tokenLabel || a.token || ''));
   } else {
     addAccountRow();
   }
@@ -360,16 +416,17 @@ async function fetchAccount(token, account, since, until, limit) {
 
 // ── LOAD ──────────────────────────────────────────────────────────────────────
 async function load() {
-  const token = $('cfg-token').value.trim();
+  const tokens = getTokens();
   const accounts = getAccounts();
   const since = $('cfg-since').value;
   const until = $('cfg-until').value;
   const limit = $('cfg-limit').value;
 
-  if (!token) { alert('Preencha o Access Token.'); return; }
+  if (!tokens.length) { alert('Adicione pelo menos um token de acesso.'); return; }
   if (!accounts.length) { alert('Adicione pelo menos uma Ad Account.'); return; }
+  if (accounts.some(a => !a.token)) { alert('Uma ou mais contas estão sem token. Verifique os tokens cadastrados.'); return; }
 
-  localStorage.setItem('meta_token', token);
+  saveTokens();
   saveAccounts();
 
   $('content').style.display = 'none';
@@ -379,7 +436,7 @@ async function load() {
 
   try {
     const results = await Promise.allSettled(
-      accounts.map(a => fetchAccount(a.token || token, a.id, since, until, limit))
+      accounts.map(a => fetchAccount(a.token, a.id, since, until, limit))
     );
 
     const errors = [];
