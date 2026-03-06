@@ -228,7 +228,7 @@
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th>#</th><th>Conta</th><th>Formato</th><th>Criativo</th>
+          <th>#</th><th>Conta</th><th>Formato</th><th style="width:52px">Prévia</th><th>Criativo</th>
           <th class="td-num">Compras</th><th class="td-num">Spend</th><th class="td-num">Receita</th>
           <th class="td-num">CAC</th><th class="td-num">ROI</th><th class="td-num">ROAS</th>
           <th class="td-num">Hook%</th><th class="td-num">CTR%</th>
@@ -411,7 +411,30 @@ async function fetchAccount(token, account, since, until, limit) {
   const res = await fetch(url);
   const json = await res.json();
   if (json.error) throw new Error(`[${account}] ${json.error.message}`);
-  return json.data || [];
+  const rows = json.data || [];
+
+  // batch-fetch creatives (thumbnail + video_id) for all ad_ids
+  if (rows.length) {
+    try {
+      const ids = rows.map(r => r.ad_id).join(',');
+      const cUrl = new URL('https://graph.facebook.com/v19.0/');
+      cUrl.searchParams.set('ids', ids);
+      cUrl.searchParams.set('fields', 'creative{thumbnail_url,video_id,object_type}');
+      cUrl.searchParams.set('access_token', token);
+      const cRes = await fetch(cUrl);
+      const cJson = await cRes.json();
+      if (!cJson.error) {
+        rows.forEach(r => {
+          const info = cJson[r.ad_id]?.creative || {};
+          r._thumbnail = info.thumbnail_url || '';
+          r._video_id  = info.video_id || '';
+          r._obj_type  = info.object_type || '';
+        });
+      }
+    } catch(_) { /* creative info optional */ }
+  }
+
+  return rows;
 }
 
 // ── LOAD ──────────────────────────────────────────────────────────────────────
@@ -465,6 +488,8 @@ async function load() {
       account: ad._account_label,
       format: classifyFormat(ad.ad_name || ''),
       metrics: calcMetrics(ad),
+      thumbnail: ad._thumbnail || '',
+      video_id: ad._video_id || '',
     }));
 
     if (errors.length) {
@@ -624,11 +649,21 @@ function render(creatives, since, until) {
     const m = c.metrics;
     const roiClass = m.roi==null?'':m.roi>=100?'good-num':m.roi>=0?'warn-num':'bad-num';
     const cacClass = m.cac==null?'':overallCac&&m.cac<overallCac*0.8?'good-num':overallCac&&m.cac>overallCac*1.3?'bad-num':'';
+    const videoHref = c.video_id
+      ? `https://www.facebook.com/video/${c.video_id}`
+      : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`;
+    const previewCell = c.thumbnail
+      ? `<a href="${videoHref}" target="_blank" rel="noopener" title="Ver vídeo">
+           <img src="${c.thumbnail}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:block" />
+         </a>`
+      : `<a href="${videoHref}" target="_blank" rel="noopener" title="Ver no Ads Manager"
+           style="font-size:16px;text-decoration:none;color:var(--accent2)">▶</a>`;
     tbody.innerHTML += `
       <tr>
         <td style="color:var(--muted)">${i+1}</td>
         <td><span class="acc-tag" title="${c.account||''}">${(c.account||'').substring(0,14)}</span></td>
         <td><span class="pill ${FMT_BADGE[c.format]||'badge-OUTROS'}">${c.format}</span></td>
+        <td style="text-align:center;padding:4px 6px">${previewCell}</td>
         <td class="td-name" title="${c.ad_name}">${c.ad_name}</td>
         <td class="td-num">${m.purchases.toFixed(0)}</td>
         <td class="td-num">${fmtBRL(m.spend)}</td>
