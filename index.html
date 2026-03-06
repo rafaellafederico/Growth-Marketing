@@ -149,10 +149,10 @@
   <h2>Configuração</h2>
   <div class="config-row">
     <div class="config-field">
-      <label>Access Token (Meta)</label>
-      <input type="text" id="cfg-token" placeholder="EAAxxxxxxxxxxxxxxxx" />
+      <label>Token padrão (Meta)</label>
+      <input type="text" id="cfg-token" placeholder="EAAxxxxxxxxxxxxxxxx — usado quando a conta não tem token próprio" style="width:340px" />
     </div>
-    <div class="config-field">
+    <div class="config-field" style="flex-basis:100%">
       <label>Ad Accounts</label>
       <div class="accounts-list" id="accounts-list"></div>
       <button class="btn-add" onclick="addAccountRow()">+ Adicionar conta</button>
@@ -290,27 +290,29 @@ function prevMonth() {
 }
 
 // ── ACCOUNTS LIST ─────────────────────────────────────────────────────────────
-function addAccountRow(id = '', label = '') {
+function addAccountRow(id = '', label = '', token = '') {
   const list = $('accounts-list');
-  const idx = list.children.length;
   const row = document.createElement('div');
   row.className = 'account-row';
   row.innerHTML = `
     <input type="text" class="acc-input" placeholder="act_123456789 ou só o número" value="${id}" oninput="saveAccounts()" />
-    <input type="text" class="acc-label-input" placeholder="Nome (opcional)" style="width:130px" value="${label}" oninput="saveAccounts()" />
+    <input type="text" class="acc-label-input" placeholder="Nome (ex: Marca A)" style="width:120px" value="${label}" oninput="saveAccounts()" />
+    <input type="text" class="acc-token-input" placeholder="Token próprio (opcional)" style="width:200px" value="${token}" oninput="saveAccounts()" />
     <button class="btn-remove" onclick="this.parentElement.remove();saveAccounts()">×</button>`;
   list.appendChild(row);
 }
 
 function getAccounts() {
   return Array.from(document.querySelectorAll('.acc-input'))
-    .map((el, i) => {
+    .map(el => {
       const raw = el.value.trim();
       if (!raw) return null;
       const id = raw.startsWith('act_') ? raw : 'act_' + raw;
       const labelEl = el.parentElement.querySelector('.acc-label-input');
+      const tokenEl = el.parentElement.querySelector('.acc-token-input');
       const label = labelEl?.value.trim() || id;
-      return { id, label };
+      const token = tokenEl?.value.trim() || '';
+      return { id, label, token };
     }).filter(Boolean);
 }
 
@@ -328,7 +330,7 @@ function saveAccounts() {
 
   const saved = JSON.parse(localStorage.getItem('meta_accounts') || '[]');
   if (saved.length) {
-    saved.forEach(a => addAccountRow(a.id, a.label));
+    saved.forEach(a => addAccountRow(a.id, a.label, a.token || ''));
   } else {
     addAccountRow();
   }
@@ -377,7 +379,7 @@ async function load() {
 
   try {
     const results = await Promise.allSettled(
-      accounts.map(a => fetchAccount(token, a.id, since, until, limit))
+      accounts.map(a => fetchAccount(a.token || token, a.id, since, until, limit))
     );
 
     const errors = [];
