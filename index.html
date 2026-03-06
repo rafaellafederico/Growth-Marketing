@@ -522,11 +522,29 @@ async function load() {
   $('content').style.display = 'none';
   $('state-msg').style.display = 'block';
   $('state-msg').className = '';
-  $('state-msg').textContent = `⏳ Buscando ${accounts.length} conta(s) em paralelo…`;
+  $('state-msg').textContent = `⏳ Buscando ${accounts.length} conta(s)…`;
+
+  // Limita concorrência: máx 3 requisições simultâneas à API do Meta
+  async function fetchWithConcurrency(tasks, concurrency = 3) {
+    const results = new Array(tasks.length);
+    let idx = 0;
+    async function worker() {
+      while (idx < tasks.length) {
+        const i = idx++;
+        try { results[i] = { status: 'fulfilled', value: await tasks[i]() }; }
+        catch (e) { results[i] = { status: 'rejected', reason: e }; }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+    return results;
+  }
 
   try {
-    const results = await Promise.allSettled(
-      accounts.map(a => fetchAccount(a.token, a.id, since, until, limit))
+    const results = await fetchWithConcurrency(
+      accounts.map((a, i) => async () => {
+        $('state-msg').textContent = `⏳ Buscando conta ${i + 1}/${accounts.length}: ${a.label || a.id}…`;
+        return fetchAccount(a.token, a.id, since, until, limit);
+      })
     );
 
     const errors = [];
