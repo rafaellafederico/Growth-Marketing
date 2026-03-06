@@ -290,7 +290,8 @@ function prevMonth() {
 // ── LOAD ──────────────────────────────────────────────────────────────────────
 async function load() {
   const token = $('cfg-token').value.trim();
-  const account = $('cfg-account').value.trim();
+  const rawAccount = $('cfg-account').value.trim();
+  const account = rawAccount.startsWith('act_') ? rawAccount : 'act_' + rawAccount;
   const since = $('cfg-since').value;
   const until = $('cfg-until').value;
   const limit = $('cfg-limit').value;
