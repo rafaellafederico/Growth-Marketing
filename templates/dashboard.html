@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Growth Marketing — Criativos Campeões</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222536;
+      --border: #2e3250;
+      --accent: #6c63ff;
+      --accent2: #00d2ff;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --radius: 12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-left: auto;
+    }
+    select, input[type="date"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    select:focus, input[type="date"]:focus { border-color: var(--accent); }
+    button#load-btn {
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s;
+    }
+    button#load-btn:hover { opacity: .85; }
+
+    /* ── LAYOUT ── */
+    main { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+
+    /* ── LOADING / ERROR ── */
+    #state-msg {
+      display: none;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    #state-msg.error { color: var(--red); }
+
+    /* ── CARDS RESUMO ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .card-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .card-value { font-size: 22px; font-weight: 700; }
+    .card-value.green { color: var(--green); }
+    .card-value.red { color: var(--red); }
+    .card-value.blue { color: var(--accent2); }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 12px;
+      margin-top: 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── GRID 2 COL ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── DESTAQUES ── */
+    .highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .highlight-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      border-left: 3px solid var(--accent);
+    }
+    .highlight-card .hl-label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+    .highlight-card .hl-value { font-size: 20px; font-weight: 700; color: var(--accent2); margin-bottom: 4px; }
+    .highlight-card .hl-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .highlight-card .hl-fmt { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── FORMATOS ── */
+    .fmt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .fmt-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .fmt-name {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .fmt-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .badge-BEST-SELLER { background: #fef3c7; color: #92400e; }
+    .badge-ACAO_PROMOCIONAL { background: #fee2e2; color: #991b1b; }
+    .badge-LANCAMENTO { background: #dbeafe; color: #1e3a8a; }
+    .badge-OUTROS { background: #f1f5f9; color: #475569; }
+    .fmt-stat { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+    .fmt-stat span:first-child { color: var(--muted); }
+    .fmt-stat span:last-child { font-weight: 600; }
+    .roi-bar { height: 4px; border-radius: 4px; margin-top: 10px; background: var(--border); }
+    .roi-bar-fill { height: 100%; border-radius: 4px; }
+    .roi-excellent .roi-bar-fill { background: var(--green); }
+    .roi-good .roi-bar-fill { background: var(--yellow); }
+    .roi-low .roi-bar-fill { background: var(--red); }
+    .roi-tag { font-size: 11px; margin-top: 6px; font-weight: 600; }
+    .roi-excellent .roi-tag { color: var(--green); }
+    .roi-good .roi-tag { color: var(--yellow); }
+    .roi-low .roi-tag { color: var(--red); }
+
+    /* ── TABELA ── */
+    .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead tr { background: var(--surface2); }
+    th { padding: 10px 12px; text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+    td { padding: 9px 12px; border-top: 1px solid var(--border); white-space: nowrap; }
+    tr:hover td { background: var(--surface2); }
+    .td-name { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
+    .td-num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pill {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .good-num { color: var(--green); }
+    .warn-num { color: var(--yellow); }
+    .bad-num { color: var(--red); }
+
+    /* ── SUGESTÕES ── */
+    .suggestions { display: flex; flex-direction: column; gap: 8px; }
+    .sug-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .sug-item.warning { border-left: 3px solid var(--yellow); }
+    .sug-item.danger { border-left: 3px solid var(--red); }
+    .sug-item.info { border-left: 3px solid var(--accent2); }
+    .sug-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── RECOMENDAÇÕES ── */
+    .recs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .rec-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .rec-title { font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: .5px; margin-bottom: 8px; }
+    .rec-title.replicar { color: var(--green); }
+    .rec-title.escalar { color: var(--accent2); }
+    .rec-title.testar { color: var(--yellow); }
+    .rec-title.descontinuar { color: var(--red); }
+    .rec-item { font-size: 12px; color: var(--text); margin-bottom: 5px; padding-left: 10px; position: relative; }
+    .rec-item::before { content: '•'; position: absolute; left: 0; color: var(--muted); }
+
+    /* ── CHART BAR ── */
+    .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+    .bar-label { width: 160px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+    .bar-track { flex: 1; height: 20px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); display: flex; align-items: center; padding-left: 6px; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; transition: width .6s ease; }
+    .bar-val { width: 70px; text-align: right; flex-shrink: 0; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Criativos Campeões</h1>
+  <div class="controls">
+    <select id="account-sel">
+      {% for id, name in accounts.items() %}
+      <option value="{{ id }}">{{ name }} ({{ id }})</option>
+      {% endfor %}
+    </select>
+    <input type="date" id="since-inp" value="{{ default_since }}" />
+    <input type="date" id="until-inp" value="{{ default_until }}" />
+    <button id="load-btn">Carregar</button>
+  </div>
+</header>
+
+<main>
+  <div id="state-msg">Clique em <strong>Carregar</strong> para buscar os dados.</div>
+  <div id="content" style="display:none">
+
+    <!-- RESUMO -->
+    <div class="section-title">Resumo Executivo</div>
+    <div class="cards">
+      <div class="card"><div class="card-label">Criativos</div><div class="card-value blue" id="s-total">—</div></div>
+      <div class="card"><div class="card-label">Com Compras</div><div class="card-value" id="s-with-purchases">—</div></div>
+      <div class="card"><div class="card-label">Compras Totais</div><div class="card-value green" id="s-purchases">—</div></div>
+      <div class="card"><div class="card-label">Investimento</div><div class="card-value" id="s-spend">—</div></div>
+      <div class="card"><div class="card-label">Receita</div><div class="card-value green" id="s-revenue">—</div></div>
+      <div class="card"><div class="card-label">CAC Médio</div><div class="card-value" id="s-cac">—</div></div>
+      <div class="card"><div class="card-label">ROI Geral</div><div class="card-value" id="s-roi">—</div></div>
+    </div>
+
+    <!-- DESTAQUES -->
+    <div class="section-title">Destaques de Métricas</div>
+    <div class="highlights">
+      <div class="highlight-card">
+        <div class="hl-label">Melhor CAC</div>
+        <div class="hl-value" id="h-cac-val">—</div>
+        <div class="hl-name" id="h-cac-name">—</div>
+        <div class="hl-fmt" id="h-cac-fmt">—</div>
+      </div>
+      <div class="highlight-card">
+        <div class="hl-label">Melhor ROI</div>
+        <div class="hl-value" id="h-roi-val">—</div>
+        <div class="hl-name" id="h-roi-name">—</div>
+        <div class="hl-fmt" id="h-roi-fmt">—</div>
+      </div>
+      <div class="highlight-card">
+        <div class="hl-label">Melhor Hook Rate</div>
+        <div class="hl-value" id="h-hook-val">—</div>
+        <div class="hl-name" id="h-hook-name">—</div>
+        <div class="hl-fmt" id="h-hook-fmt">—</div>
+      </div>
+      <div class="highlight-card">
+        <div class="hl-label">Melhor ROAS</div>
+        <div class="hl-value" id="h-roas-val">—</div>
+        <div class="hl-name" id="h-roas-name">—</div>
+        <div class="hl-fmt" id="h-roas-fmt">—</div>
+      </div>
+    </div>
+
+    <!-- FORMATOS -->
+    <div class="section-title">Análise por Formato</div>
+    <div class="fmt-grid" id="fmt-grid"></div>
+
+    <!-- TABELA + COMPRAS CHART -->
+    <div class="grid-2" style="margin-top:0">
+      <div>
+        <div class="section-title">Top Criativos por Compras</div>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
+      <div>
+        <div class="section-title">O que Poderia Melhorar</div>
+        <div class="suggestions" id="suggestions"></div>
+      </div>
+    </div>
+
+    <!-- RECOMENDAÇÕES -->
+    <div class="section-title">Recomendações para o Próximo Mês</div>
+    <div class="recs">
+      <div class="rec-card">
+        <div class="rec-title replicar">Replicar</div>
+        <div id="rec-replicar"></div>
+      </div>
+      <div class="rec-card">
+        <div class="rec-title escalar">Escalar</div>
+        <div id="rec-escalar"></div>
+      </div>
+      <div class="rec-card">
+        <div class="rec-title testar">Testar</div>
+        <div id="rec-testar"></div>
+      </div>
+      <div class="rec-card">
+        <div class="rec-title descontinuar">Descontinuar</div>
+        <div id="rec-descontinuar"></div>
+      </div>
+    </div>
+
+    <!-- TABELA COMPLETA -->
+    <div class="section-title">Todos os Criativos</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Formato</th>
+            <th>Criativo</th>
+            <th class="td-num">Compras</th>
+            <th class="td-num">Spend</th>
+            <th class="td-num">Receita</th>
+            <th class="td-num">CAC</th>
+            <th class="td-num">ROI</th>
+            <th class="td-num">ROAS</th>
+            <th class="td-num">Hook%</th>
+            <th class="td-num">CTR%</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const fmtBRL = v => v != null ? `R$${v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '—';
+const fmtPct = v => v != null ? `${v.toFixed(2)}%` : '—';
+const fmtNum = v => v != null ? v.toLocaleString('pt-BR',{maximumFractionDigits:0}) : '—';
+
+const ROI_LABELS = { excellent: '✔ ROI Excelente', good: '✔ ROI Positivo', low: '⚠ ROI Baixo' };
+const FMT_BADGE = {
+  'BEST-SELLER':'badge-BEST-SELLER',
+  'ACAO_PROMOCIONAL':'badge-ACAO_PROMOCIONAL',
+  'LANCAMENTO':'badge-LANCAMENTO',
+  'OUTROS':'badge-OUTROS',
+};
+
+async function load() {
+  const account = $('account-sel').value;
+  const since = $('since-inp').value;
+  const until = $('until-inp').value;
+
+  $('content').style.display = 'none';
+  $('state-msg').style.display = 'block';
+  $('state-msg').className = '';
+  $('state-msg').textContent = '⏳ Buscando dados da Meta Ads API…';
+
+  try {
+    const res = await fetch(`/api/creatives?account_id=${account}&since=${since}&until=${until}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    render(data);
+    $('state-msg').style.display = 'none';
+    $('content').style.display = 'block';
+  } catch(e) {
+    $('state-msg').className = 'error';
+    $('state-msg').textContent = '❌ Erro: ' + e.message;
+  }
+}
+
+function render(data) {
+  const { creatives, analysis } = data;
+  const s = analysis.summary;
+
+  // Resumo
+  $('s-total').textContent = s.total;
+  $('s-with-purchases').textContent = `${s.with_purchases} (${Math.round(s.with_purchases/s.total*100)}%)`;
+  $('s-purchases').textContent = fmtNum(s.total_purchases);
+  $('s-spend').textContent = fmtBRL(s.total_spend);
+  $('s-revenue').textContent = fmtBRL(s.total_revenue);
+  $('s-cac').textContent = fmtBRL(s.overall_cac);
+  const roiEl = $('s-roi');
+  roiEl.textContent = fmtPct(s.overall_roi);
+  roiEl.className = 'card-value ' + (s.overall_roi >= 100 ? 'green' : s.overall_roi >= 0 ? '' : 'red');
+
+  // Destaques
+  function setHL(prefix, obj, valFmt) {
+    if (!obj) return;
+    $(prefix+'-val').textContent = valFmt(obj.value);
+    $(prefix+'-name').textContent = obj.name;
+    $(prefix+'-fmt').textContent = '[' + obj.format + ']';
+  }
+  const hl = analysis.highlights;
+  setHL('h-cac', hl.best_cac, fmtBRL);
+  setHL('h-roi', hl.best_roi, fmtPct);
+  setHL('h-hook', hl.best_hook, fmtPct);
+  setHL('h-roas', hl.best_roas, v => v ? v.toString() : '—');
+
+  // Formatos
+  const fmtGrid = $('fmt-grid');
+  fmtGrid.innerHTML = '';
+  for (const f of analysis.formats) {
+    const roiWidth = Math.min(100, Math.max(0, ((f.avg_roi || 0) / 500) * 100));
+    fmtGrid.innerHTML += `
+      <div class="fmt-card roi-${f.roi_status}">
+        <div class="fmt-name">
+          <span class="pill fmt-badge ${FMT_BADGE[f.name]||'badge-OUTROS'}">${f.name}</span>
+          <span style="color:var(--muted);font-size:11px;font-weight:400">${f.count} criativos</span>
+        </div>
+        <div class="fmt-stat"><span>Compras</span><span>${fmtNum(f.purchases)}</span></div>
+        <div class="fmt-stat"><span>Investimento</span><span>${fmtBRL(f.spend)}</span></div>
+        <div class="fmt-stat"><span>CAC médio</span><span>${fmtBRL(f.avg_cac)}</span></div>
+        <div class="fmt-stat"><span>ROI médio</span><span>${fmtPct(f.avg_roi)}</span></div>
+        <div class="fmt-stat"><span>ROAS médio</span><span>${f.avg_roas ?? '—'}</span></div>
+        <div class="fmt-stat"><span>Hook Rate</span><span>${fmtPct(f.avg_hook)}</span></div>
+        <div class="fmt-stat"><span>CTR</span><span>${fmtPct(f.avg_ctr)}</span></div>
+        <div class="roi-bar"><div class="roi-bar-fill" style="width:${roiWidth}%"></div></div>
+        <div class="roi-tag">${ROI_LABELS[f.roi_status]}</div>
+      </div>`;
+  }
+
+  // Bar chart top 10 por compras
+  const top10 = [...creatives].sort((a,b) => b.metrics.purchases - a.metrics.purchases).slice(0,10);
+  const maxPurchases = top10[0]?.metrics.purchases || 1;
+  const barChart = $('bar-chart');
+  barChart.innerHTML = '';
+  for (const c of top10) {
+    const pct = Math.round((c.metrics.purchases / maxPurchases) * 100);
+    barChart.innerHTML += `
+      <div class="bar-row">
+        <div class="bar-label" title="${c.ad_name}">${c.ad_name.substring(0,28)}…</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${pct}%">${c.metrics.purchases.toFixed(0)}</div>
+        </div>
+        <div class="bar-val">${fmtBRL(c.metrics.cac)}</div>
+      </div>`;
+  }
+
+  // Sugestões
+  const sugEl = $('suggestions');
+  sugEl.innerHTML = '';
+  const icons = { warning: '⚠️', danger: '🚨', info: 'ℹ️' };
+  for (const s of analysis.suggestions) {
+    sugEl.innerHTML += `<div class="sug-item ${s.type}"><span class="sug-icon">${icons[s.type]||'•'}</span><span>${s.text}</span></div>`;
+  }
+  if (!analysis.suggestions.length) {
+    sugEl.innerHTML = '<div class="sug-item info"><span class="sug-icon">✅</span><span>Todos os criativos com métricas dentro do esperado.</span></div>';
+  }
+
+  // Recomendações
+  const bf = analysis.best_format;
+  const bh = hl.best_hook;
+  $('rec-replicar').innerHTML = [
+    bf ? `<div class="rec-item">Formato [${bf}] teve melhor ROI médio — produzir mais.</div>` : '',
+    bh ? `<div class="rec-item">Abertura do criativo "${bh.name.substring(0,30)}…" — Hook ${fmtPct(bh.value)}.</div>` : '',
+  ].join('') || '<div class="rec-item">Identificar padrão dos top 5 e replicar estrutura.</div>';
+
+  const sc = analysis.scale_candidates;
+  $('rec-escalar').innerHTML = sc.length
+    ? sc.map(c => `<div class="rec-item">${c.name.substring(0,35)} — ROI ${fmtPct(c.roi)}</div>`).join('')
+    : '<div class="rec-item">Criativos com ROI > 150% e 10+ compras — aumentar budget +20%/semana.</div>';
+
+  $('rec-testar').innerHTML = [
+    '<div class="rec-item">Variações de copy nos top 5 (manter visual, mudar headline).</div>',
+    '<div class="rec-item">Formatos ausentes no mix — diversificar.</div>',
+    '<div class="rec-item">Abertura em vídeo para criativos com Hook Rate fraco.</div>',
+  ].join('');
+
+  const hcac = hl.best_cac;
+  $('rec-descontinuar').innerHTML = '<div class="rec-item">Criativos com CAC 30%+ acima da média — pausar se não melhorarem em 7 dias.</div>';
+
+  // Tabela
+  const tbody = $('table-body');
+  tbody.innerHTML = '';
+  creatives.forEach((c, i) => {
+    const m = c.metrics;
+    const roiClass = m.roi == null ? '' : m.roi >= 100 ? 'good-num' : m.roi >= 0 ? 'warn-num' : 'bad-num';
+    const cacClass = m.cac == null ? '' : s.overall_cac && m.cac < s.overall_cac * 0.8 ? 'good-num' : s.overall_cac && m.cac > s.overall_cac * 1.3 ? 'bad-num' : '';
+    tbody.innerHTML += `
+      <tr>
+        <td style="color:var(--muted)">${i+1}</td>
+        <td><span class="pill ${FMT_BADGE[c.format]||'badge-OUTROS'}">${c.format}</span></td>
+        <td class="td-name" title="${c.ad_name}">${c.ad_name}</td>
+        <td class="td-num">${m.purchases.toFixed(0)}</td>
+        <td class="td-num">${fmtBRL(m.spend)}</td>
+        <td class="td-num">${fmtBRL(m.purchase_value)}</td>
+        <td class="td-num ${cacClass}">${fmtBRL(m.cac)}</td>
+        <td class="td-num ${roiClass}">${fmtPct(m.roi)}</td>
+        <td class="td-num">${m.roas ?? '—'}</td>
+        <td class="td-num">${fmtPct(m.hook_rate)}</td>
+        <td class="td-num">${fmtPct(m.ctr)}</td>
+      </tr>`;
+  });
+}
+
+$('load-btn').addEventListener('click', load);
+// Carrega automaticamente ao abrir
+load();
+</script>
+</body>
+</html>
