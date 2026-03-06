@@ -149,7 +149,8 @@
     /* SCRIPT MODAL */
     #video-modal  { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:1000; align-items:center; justify-content:center; }
     #video-modal.open  { display:flex; }
-    #vid-modal-body video { width:100%; border-radius:8px; background:#000; max-height:65vh; }
+    #vid-modal-body iframe { border:none; width:100%; border-radius:8px; }
+    #vid-modal-body video  { width:100%; border-radius:8px; background:#000; max-height:65vh; }
     .thumb-play { position:relative; cursor:pointer; display:block; }
     .thumb-play::after { content:'▶'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:28px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.7); pointer-events:none; }
     .thumb-play img { display:block; width:44px; height:44px; object-fit:cover; border-radius:4px; border:1px solid var(--border); }
@@ -620,47 +621,50 @@ function adRec(c, overallCac) {
 // ── VIDEO MODAL ───────────────────────────────────────────────────────────────
 function closeVideoModal() {
   const el = $('video-modal');
+  // clear iframe/video to stop playback
+  const body = $('vid-modal-body');
+  if (body) body.innerHTML = '';
   el.classList.remove('open');
-  // stop playback
-  const v = el.querySelector('video');
-  if (v) { v.pause(); v.src = ''; }
 }
 
 async function openVideoModal(c) {
   $('vid-modal-title').textContent = c.ad_name;
-  $('vid-modal-foot').textContent = '';
+  $('vid-modal-foot').innerHTML = '';
   const body = $('vid-modal-body');
-  body.innerHTML = '<span style="color:var(--muted);font-size:12px;font-style:italic">⏳ Carregando vídeo…</span>';
+  body.innerHTML = '<span style="color:var(--muted);font-size:12px;font-style:italic">⏳ Carregando prévia…</span>';
   $('video-modal').classList.add('open');
 
-  try {
-    if (!c.video_id) throw new Error('no_video_id');
-    if (!c.token) throw new Error('no_token');
-    const srcUrl = `https://graph.facebook.com/v19.0/${c.video_id}?fields=source&access_token=${encodeURIComponent(c.token)}`;
-    const res = await fetch(srcUrl);
-    const json = await res.json();
-    if (json.error) throw new Error(json.error.message);
-    const mp4 = json.source;
-    if (!mp4) throw new Error('URL de vídeo não disponível para este criativo.');
-    body.innerHTML = `<video controls autoplay playsinline src="${mp4}" ${c.thumbnail ? `poster="${c.thumbnail}"` : ''}></video>`;
-  } catch(e) {
-    // fallback: show thumbnail + external link
-    const fbLink = c.video_id
-      ? `https://www.facebook.com/video/${c.video_id}`
-      : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`;
-    body.innerHTML = c.thumbnail
-      ? `<a href="${fbLink}" target="_blank" rel="noopener" style="display:block;width:100%">
-           <img src="${c.thumbnail}" style="width:100%;border-radius:8px;border:1px solid var(--border)" />
-         </a>
-         <p style="font-size:11px;color:var(--muted);text-align:center">
-           ${e.message === 'no_video_id' ? 'Este criativo não tem vídeo.' : 'Não foi possível carregar o vídeo inline.'}
-           <a href="${fbLink}" target="_blank" rel="noopener" style="color:var(--accent2)">Abrir no Facebook ↗</a>
-         </p>`
-      : `<p style="font-size:12px;color:var(--muted)">
-           Sem pré-visualização disponível.
-           <a href="${fbLink}" target="_blank" rel="noopener" style="color:var(--accent2)">Abrir no Ads Manager ↗</a>
-         </p>`;
+  const fallbackLink = c.video_id
+    ? `https://www.facebook.com/video/${c.video_id}`
+    : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`;
+
+  // Try Ad Preview API first — returns official Meta iframe (no CORS issues)
+  if (c.token && c.ad_id) {
+    try {
+      const pUrl = `https://graph.facebook.com/v19.0/${c.ad_id}/previews?ad_format=MOBILE_FEED_STANDARD&access_token=${encodeURIComponent(c.token)}`;
+      const res = await fetch(pUrl);
+      const json = await res.json();
+      const iframeHtml = json.data?.[0]?.body;
+      if (iframeHtml) {
+        // Meta returns HTML-encoded iframe; decode it
+        const decoded = iframeHtml.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
+        // Resize iframe to fit modal
+        const sized = decoded.replace(/width=["']?\d+["']?/,'width="100%"').replace(/height=["']?\d+["']?/,'height="500"');
+        body.innerHTML = `<div style="width:100%;min-height:300px">${sized}</div>`;
+        $('vid-modal-foot').innerHTML = `<a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:11px">Abrir no Facebook ↗</a>`;
+        return;
+      }
+    } catch(_) { /* fall through */ }
   }
+
+  // Fallback: show thumbnail lightbox
+  body.innerHTML = c.thumbnail
+    ? `<img src="${c.thumbnail}" style="width:100%;border-radius:8px;border:1px solid var(--border)" />
+       <p style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Prévia não disponível.
+         <a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2)">Abrir no Facebook ↗</a></p>`
+    : `<p style="font-size:12px;color:var(--muted);text-align:center">
+         Sem prévia disponível.
+         <a href="${fallbackLink}" target="_blank" rel="noopener" style="color:var(--accent2)">Abrir no Ads Manager ↗</a></p>`;
 }
 
 // ── SCRIPT MODAL ──────────────────────────────────────────────────────────────
