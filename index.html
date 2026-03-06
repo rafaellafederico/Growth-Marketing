@@ -672,35 +672,38 @@ function copyScript() { navigator.clipboard.writeText(_lastScript).catch(()=>{})
 // ── SMART TEMPLATE SCRIPT GENERATOR ──────────────────────────────────────────
 function guessProduct(name) {
   const n = name.toLowerCase();
-  if (/skin|creme|sérum|hidrat|facial|beleza|cosmet|maquiagem/.test(n)) return { cat:'beleza', prod:'produto de skincare', dor:'pele ressecada, manchas ou sinais de envelhecimento', resultado:'pele hidratada e radiante' };
+  if (/semijoia|semi.joia/.test(n)) return { cat:'semijoia', prod:'semijoia', dor:'querer se sentir elegante sem gastar muito em joia de ouro', resultado:'visual sofisticado e elegante sem pesar no bolso' };
+  if (/skin|creme|sérum|sérum|hidrat|facial|beleza|cosmet|maquiagem/.test(n)) return { cat:'beleza', prod:'produto de skincare', dor:'pele ressecada, manchas ou sinais de envelhecimento', resultado:'pele hidratada e radiante' };
   if (/cabelo|hair|shampoo|condicion|cachos|lisos/.test(n)) return { cat:'cabelo', prod:'produto capilar', dor:'cabelo danificado, ressecado ou sem volume', resultado:'cabelos mais saudáveis e brilhantes' };
   if (/roupa|vestido|camisa|calça|moda|fashion|look|outfit/.test(n)) return { cat:'moda', prod:'peça de roupa', dor:'dificuldade de montar looks bonitos e acessíveis', resultado:'look completo e estiloso' };
   if (/suplemento|whey|protein|creatina|pré-treino|fitness|academia|muscula/.test(n)) return { cat:'fitness', prod:'suplemento', dor:'dificuldade de ganhar massa ou emagrecer', resultado:'resultados mais rápidos na academia' };
   if (/curso|aula|treinamento|mentoria|ebook|digital|aprend/.test(n)) return { cat:'infoproduto', prod:'curso online', dor:'falta de conhecimento ou resultados na área', resultado:'transformação real com método comprovado' };
   if (/sapato|tênis|sandália|calçado/.test(n)) return { cat:'calçados', prod:'calçado', dor:'conforto e estilo ao mesmo tempo', resultado:'conforto e estilo no dia a dia' };
-  if (/joia|colar|pulseira|anel|brinco|acess/.test(n)) return { cat:'acessórios', prod:'acessório', dor:'looks sem personalidade', resultado:'look completo com personalidade' };
+  if (/pulseira|colar|anel|brinco/.test(n)) { const p = n.match(/pulseira|colar|anel|brinco/)[0]; return { cat:'joia', prod:p, dor:`querer usar ${p} bonita sem gastar uma fortuna`, resultado:`look mais elegante com ${p} de qualidade` }; }
+  if (/joia|acess/.test(n)) return { cat:'joia', prod:'joia', dor:'querer se sentir elegante sem gastar muito', resultado:'visual sofisticado e marcante' };
   if (/pet|cachorro|gato|animal/.test(n)) return { cat:'pet', prod:'produto pet', dor:'saúde e bem-estar do seu pet', resultado:'pet mais saudável e feliz' };
-  return { cat:'produto', prod:'esse produto', dor:'problema do dia a dia', resultado:'resultado incrível' };
+  // fallback: tenta extrair palavra-chave do nome do anúncio
+  const words = n.replace(/[-_]/g,' ').split(' ').filter(w => w.length > 4 && !/^(ad|vd|oc|sp|br|meta|ads|test|camp|cri|cria|video|imag)\d*$/.test(w));
+  const keyword = words[0] || 'produto';
+  return { cat:'produto', prod:keyword, dor:`dificuldade de encontrar ${keyword} de qualidade`, resultado:`resultado incrível com ${keyword}` };
 }
 
 function buildHooks(m, info) {
-  const hooks = [];
+  // Hook rate < 1 = crítico: precisa de hook de choque visual imediato
+  if (m.hookRate != null && m.hookRate < 1)
+    return `[CRÍTICO — Hook Rate ${m.hookRate}%] Abra o vídeo já com a ${info.prod} no pescoço/pulso/mão de uma pessoa real, sem introdução. Corte direto ao produto nos primeiros 0.5s. Sem texto, sem logo.`;
   if (m.hookRate != null && m.hookRate < 15)
-    hooks.push(`"Você ainda não conhece ${info.prod}?" — [olhar direto para câmera, 1 segundo de silêncio]`);
-  else if (m.hookRate != null && m.hookRate >= 30)
-    hooks.push(`[Manter o que está funcionando] Mostre o resultado final do produto logo nos primeiros 2s antes de qualquer explicação`);
-  else
-    hooks.push(`"Para tudo." — [produto em close, resultado visível nos primeiros 2 segundos]`);
-  if (m.ctr < 1)
-    hooks.push(`"Não role esse vídeo ainda." — [texto na tela grande, corte rápido para o produto]`);
-  else
-    hooks.push(`[Abrir com transformação: antes/depois, ou unboxing surpresa em close]`);
-  return hooks[0];
+    return `"Olha que ${info.prod} incrível…" — [close no produto brilhando, nenhuma pessoa em cena ainda, fundo neutro, 1.5s de silêncio antes de falar]`;
+  if (m.hookRate != null && m.hookRate >= 30)
+    return `[Hook já funciona — mantenha o mesmo estilo de abertura] Mostre o resultado (${info.prod} sendo usada) logo no frame 1`;
+  return `[Unboxing surpresa: caixa sendo aberta revelando a ${info.prod}, corte rápido, luz natural]`;
 }
 
 function buildTips(m, info, overallCac) {
   const tips = [];
-  if (m.hookRate != null && m.hookRate < 15)
+  if (m.hookRate != null && m.hookRate < 1)
+    tips.push(`🚨 Hook Rate ${m.hookRate}% — CRÍTICO. Quase ninguém assiste além dos primeiros 3 segundos. Refaça a abertura: produto em close imediato, sem logo, sem música de intro, sem "Olá!". Teste UGC (pessoa real segurando o produto no primeiro frame).`);
+  else if (m.hookRate != null && m.hookRate < 15)
     tips.push(`📉 Hook Rate ${m.hookRate}% — abaixo do ideal (>25%). Teste abrir o vídeo com o resultado final ou com uma pergunta provocativa. Os primeiros 3 segundos definem tudo.`);
   else if (m.hookRate != null && m.hookRate >= 30)
     tips.push(`✅ Hook Rate ${m.hookRate}% — excelente. Mantenha o mesmo estilo de abertura nos próximos criativos.`);
@@ -733,21 +736,21 @@ function generateTemplateScript(c, overallCac) {
 ${hook}
 
 ❗ PROBLEMA (3–8s)
-"Eu sei que ${info.dor} é frustrante — e você provavelmente já tentou de tudo, né?"
+"${info.dor[0].toUpperCase() + info.dor.slice(1)} — e você provavelmente já desistiu de encontrar algo bom."
 [tom empático, fundo simples, sem distrações]
 
 ✅ SOLUÇÃO (8–20s)
-"Foi aí que eu descobri ${info.prod} — ${roiTag}."
-[demonstração rápida, close no produto, mostrar textura/uso/resultado]
-"É simples, funciona de verdade, e você começa a ver diferença ${info.cat === 'beleza' || info.cat === 'cabelo' ? 'na primeira semana' : info.cat === 'fitness' ? 'em 30 dias' : 'rápido'}."
+"Foi aí que eu descobri essa ${info.prod} — ${roiTag}."
+[demonstração: ${info.cat === 'semijoia' ? 'pessoa colocando a semijoia, close no brilho, skin tone natural' : info.cat === 'beleza' ? 'aplicação do produto na pele, antes e depois' : info.cat === 'fitness' ? 'pessoa treinando com resultado visível' : 'produto em uso real, mãos segurando'}]
+"${info.cat === 'semijoia' ? 'Não enferruja, não mancha a pele e parece de verdade.' : info.cat === 'beleza' ? 'É simples, funciona de verdade, e você vê diferença na primeira semana.' : info.cat === 'fitness' ? 'Simples, funciona de verdade, e dá resultado em 30 dias.' : 'É simples, funciona de verdade e o resultado é real.'}"
 
 ⭐ PROVA SOCIAL (20–25s)
-${m.purchases > 50 ? `"Mais de ${Math.floor(m.purchases/10)*10} pessoas já compraram e estão amando."` : m.purchases > 10 ? `"Olha o que estão falando quem já recebeu o produto..."` : '"[Inserir print de depoimento real de cliente ou avaliação 5 estrelas]"'}
-[texto na tela com número ou depoimento curto]
+${m.purchases > 50 ? `"Mais de ${Math.floor(m.purchases/10)*10} pessoas já compraram essa ${info.prod} e adoraram."` : m.purchases > 5 ? `"[Mostrar print de avaliação 5 estrelas de cliente real falando sobre a ${info.prod}]"` : `"[Inserir depoimento real: cliente usando a ${info.prod}, vídeo UGC ou print de avaliação]"`}
+[texto grande na tela + voz]
 
 📣 CTA (25–30s)
-"Aproveita ${m.roi != null && m.roi >= 100 ? '— tá com desconto agora' : 'enquanto tem estoque'}, link na bio ou clica aqui embaixo."
-[produto em destaque, urgência visual, botão claro]
+"Aproveita ${m.roi != null && m.roi >= 0 ? '— ainda tem no estoque' : '— link na bio com frete grátis hoje'}, clica aqui embaixo agora."
+[${info.prod} em destaque, urgência visual, botão claro na tela]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 💡 DICAS BASEADAS NAS SUAS MÉTRICAS
