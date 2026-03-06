@@ -63,7 +63,7 @@ def get_top_creatives(ad_account_id: str, since: str, until: str, limit: int = 4
         ]),
         "sort": "actions_purchase:descending",
         "limit": limit,
-        "action_attribution_windows": "['7d_click','1d_view']",
+        "action_attribution_windows": json.dumps(["7d_click", "1d_view"]),
     }
     response = requests.get(url, params=params)
     response.raise_for_status()
