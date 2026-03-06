@@ -66,10 +66,11 @@ def get_top_creatives(ad_account_id: str, since: str, until: str, limit: int = 4
     }
     response = requests.get(url, params=params)
     if not response.ok:
-        import sys
-        print(f"\n[META API ERROR {response.status_code}]\n{response.text}\n", flush=True)
-        sys.stdout.flush()
-    response.raise_for_status()
+        try:
+            error_detail = response.json()
+        except Exception:
+            error_detail = response.text
+        raise ValueError(f"Meta API {response.status_code}: {error_detail}")
     return response.json().get("data", [])
 
 
