@@ -157,16 +157,13 @@
     .thumb-play-lg { position:relative; cursor:pointer; display:block; }
     .thumb-play-lg::after { content:'▶'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:30px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.7); pointer-events:none; }
     .thumb-play-lg img { display:block; width:100%; border-radius:8px; border:1px solid var(--border); }
-    #script-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:1000; align-items:center; justify-content:center; }
-    #script-modal.open { display:flex; }
     .modal-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); width:min(680px,95vw); max-height:88vh; display:flex; flex-direction:column; }
     .modal-head { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
     .modal-head h3 { font-size:14px; font-weight:700; }
     .modal-close { background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; line-height:1; }
     .modal-body { padding:20px; overflow-y:auto; flex:1; white-space:pre-wrap; font-size:12px; line-height:1.7; color:var(--text); }
     .modal-body .loading { color:var(--muted); font-style:italic; }
-    .btn-script { font-size:10px; padding:3px 8px; border-radius:6px; border:1px solid var(--accent); color:var(--accent2); background:transparent; cursor:pointer; white-space:nowrap; }
-    .btn-script:hover { background:var(--surface2); }
+
     .modal-foot { padding:12px 20px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; }
 
     /* COLLAB SECTION */
@@ -235,19 +232,7 @@
   </div>
 </div>
 
-<!-- SCRIPT MODAL -->
-<div id="script-modal" onclick="if(event.target===this)closeModal()">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3 id="modal-title">Script de Criativo</h3>
-      <button class="modal-close" onclick="closeModal()">×</button>
-    </div>
-    <div class="modal-body" id="modal-body"></div>
-    <div class="modal-foot">
-      <button class="btn-script" onclick="copyScript()">Copiar</button>
-      <button class="btn-script" style="border-color:var(--border);color:var(--muted)" onclick="closeModal()">Fechar</button>
-    </div>
-  </div>
+
 </div>
 
 <main>
@@ -308,7 +293,7 @@
           <th class="td-num">Compras</th><th class="td-num">Spend</th><th class="td-num">Receita</th>
           <th class="td-num">CAC</th><th class="td-num">ROI</th><th class="td-num">ROAS</th>
           <th class="td-num">Hook%</th><th class="td-num">CTR%</th>
-          <th>Recomendação</th><th>Script</th>
+          <th>Recomendação</th>
         </tr></thead>
         <tbody id="table-body"></tbody>
       </table>
@@ -667,145 +652,6 @@ async function openVideoModal(c) {
          Sem prévia disponível. ${igBtn}${fbBtn}</p>`;
 }
 
-// ── SCRIPT MODAL ──────────────────────────────────────────────────────────────
-let _lastScript = '';
-
-function closeModal() { $('script-modal').classList.remove('open'); }
-function copyScript() { navigator.clipboard.writeText(_lastScript).catch(()=>{}); }
-
-// ── SMART TEMPLATE SCRIPT GENERATOR ──────────────────────────────────────────
-function guessProduct(name) {
-  const n = name.toLowerCase();
-  if (/semijoia|semi.joia/.test(n)) return { cat:'semijoia', prod:'semijoia', dor:'querer se sentir elegante sem gastar muito em joia de ouro', resultado:'visual sofisticado e elegante sem pesar no bolso' };
-  if (/skin|creme|sérum|sérum|hidrat|facial|beleza|cosmet|maquiagem/.test(n)) return { cat:'beleza', prod:'produto de skincare', dor:'pele ressecada, manchas ou sinais de envelhecimento', resultado:'pele hidratada e radiante' };
-  if (/cabelo|hair|shampoo|condicion|cachos|lisos/.test(n)) return { cat:'cabelo', prod:'produto capilar', dor:'cabelo danificado, ressecado ou sem volume', resultado:'cabelos mais saudáveis e brilhantes' };
-  if (/roupa|vestido|camisa|calça|moda|fashion|look|outfit/.test(n)) return { cat:'moda', prod:'peça de roupa', dor:'dificuldade de montar looks bonitos e acessíveis', resultado:'look completo e estiloso' };
-  if (/suplemento|whey|protein|creatina|pré-treino|fitness|academia|muscula/.test(n)) return { cat:'fitness', prod:'suplemento', dor:'dificuldade de ganhar massa ou emagrecer', resultado:'resultados mais rápidos na academia' };
-  if (/curso|aula|treinamento|mentoria|ebook|digital|aprend/.test(n)) return { cat:'infoproduto', prod:'curso online', dor:'falta de conhecimento ou resultados na área', resultado:'transformação real com método comprovado' };
-  if (/sapato|tênis|sandália|calçado/.test(n)) return { cat:'calçados', prod:'calçado', dor:'conforto e estilo ao mesmo tempo', resultado:'conforto e estilo no dia a dia' };
-  if (/pulseira|colar|anel|brinco/.test(n)) { const p = n.match(/pulseira|colar|anel|brinco/)[0]; return { cat:'joia', prod:p, dor:`querer usar ${p} bonita sem gastar uma fortuna`, resultado:`look mais elegante com ${p} de qualidade` }; }
-  if (/joia|acess/.test(n)) return { cat:'joia', prod:'joia', dor:'querer se sentir elegante sem gastar muito', resultado:'visual sofisticado e marcante' };
-  if (/pet|cachorro|gato|animal/.test(n)) return { cat:'pet', prod:'produto pet', dor:'saúde e bem-estar do seu pet', resultado:'pet mais saudável e feliz' };
-  // fallback: tenta extrair palavra-chave do nome do anúncio
-  const words = n.replace(/[-_]/g,' ').split(' ').filter(w => w.length > 4 && !/^(ad|vd|oc|sp|br|meta|ads|test|camp|cri|cria|video|imag)\d*$/.test(w));
-  const keyword = words[0] || 'produto';
-  return { cat:'produto', prod:keyword, dor:`dificuldade de encontrar ${keyword} de qualidade`, resultado:`resultado incrível com ${keyword}` };
-}
-
-function buildHooks(m, info) {
-  // Hook rate < 1 = crítico: precisa de hook de choque visual imediato
-  if (m.hookRate != null && m.hookRate < 1)
-    return `[CRÍTICO — Hook Rate ${m.hookRate}%] Abra o vídeo já com a ${info.prod} no pescoço/pulso/mão de uma pessoa real, sem introdução. Corte direto ao produto nos primeiros 0.5s. Sem texto, sem logo.`;
-  if (m.hookRate != null && m.hookRate < 15)
-    return `"Olha que ${info.prod} incrível…" — [close no produto brilhando, nenhuma pessoa em cena ainda, fundo neutro, 1.5s de silêncio antes de falar]`;
-  if (m.hookRate != null && m.hookRate >= 30)
-    return `[Hook já funciona — mantenha o mesmo estilo de abertura] Mostre o resultado (${info.prod} sendo usada) logo no frame 1`;
-  return `[Unboxing surpresa: caixa sendo aberta revelando a ${info.prod}, corte rápido, luz natural]`;
-}
-
-function buildTips(m, info, overallCac) {
-  const tips = [];
-  if (m.hookRate != null && m.hookRate < 1)
-    tips.push(`🚨 Hook Rate ${m.hookRate}% — CRÍTICO. Quase ninguém assiste além dos primeiros 3 segundos. Refaça a abertura: produto em close imediato, sem logo, sem música de intro, sem "Olá!". Teste UGC (pessoa real segurando o produto no primeiro frame).`);
-  else if (m.hookRate != null && m.hookRate < 15)
-    tips.push(`📉 Hook Rate ${m.hookRate}% — abaixo do ideal (>25%). Teste abrir o vídeo com o resultado final ou com uma pergunta provocativa. Os primeiros 3 segundos definem tudo.`);
-  else if (m.hookRate != null && m.hookRate >= 30)
-    tips.push(`✅ Hook Rate ${m.hookRate}% — excelente. Mantenha o mesmo estilo de abertura nos próximos criativos.`);
-  if (m.ctr < 0.8)
-    tips.push(`📉 CTR ${m.ctr}% — baixo. Teste um CTA mais urgente no vídeo ("Só hoje", "Últimas unidades") e mude o texto do botão do anúncio.`);
-  if (overallCac && m.cac && m.cac > overallCac * 1.3)
-    tips.push(`⚠ CAC R$${m.cac} está 30%+ acima da média (R$${overallCac}). Considere refinar o público ou testar um criativo com prova social mais forte.`);
-  if (m.roi != null && m.roi >= 150)
-    tips.push(`🚀 ROI ${m.roi}% — escale esse criativo aumentando o orçamento em 20% a cada 48h enquanto o CAC se mantiver.`);
-  if (tips.length === 0)
-    tips.push(`🔁 Teste uma variação desse criativo com abordagem diferente (ex: UGC vs produzido, ou depoimento real vs demonstração).`);
-  if (tips.length === 1)
-    tips.push(`📊 Com ${m.purchases} compras registradas, esse criativo tem dados suficientes para decisão. ${m.roi != null && m.roi < 0 ? 'Pause e redirecione o budget.' : 'Continue monitorando o CAC diariamente.'}`);
-  return tips.slice(0,2);
-}
-
-function generateTemplateScript(c, overallCac) {
-  const m = c.metrics;
-  const info = guessProduct(c.ad_name);
-  const hook = buildHooks(m, info);
-  const tips = buildTips(m, info, overallCac);
-  const roiTag = m.roi != null && m.roi >= 100 ? 'comprovado por quem já comprou'
-               : m.roi != null && m.roi >= 0   ? 'testado e aprovado'
-               : 'pensado pra resolver isso de vez';
-
-  return `📋 SCRIPT GERADO COM BASE NAS MÉTRICAS REAIS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎬 HOOK (0–3s)
-${hook}
-
-❗ PROBLEMA (3–8s)
-"${info.dor[0].toUpperCase() + info.dor.slice(1)} — e você provavelmente já desistiu de encontrar algo bom."
-[tom empático, fundo simples, sem distrações]
-
-✅ SOLUÇÃO (8–20s)
-"Foi aí que eu descobri essa ${info.prod} — ${roiTag}."
-[demonstração: ${info.cat === 'semijoia' ? 'pessoa colocando a semijoia, close no brilho, skin tone natural' : info.cat === 'beleza' ? 'aplicação do produto na pele, antes e depois' : info.cat === 'fitness' ? 'pessoa treinando com resultado visível' : 'produto em uso real, mãos segurando'}]
-"${info.cat === 'semijoia' ? 'Não enferruja, não mancha a pele e parece de verdade.' : info.cat === 'beleza' ? 'É simples, funciona de verdade, e você vê diferença na primeira semana.' : info.cat === 'fitness' ? 'Simples, funciona de verdade, e dá resultado em 30 dias.' : 'É simples, funciona de verdade e o resultado é real.'}"
-
-⭐ PROVA SOCIAL (20–25s)
-${m.purchases > 50 ? `"Mais de ${Math.floor(m.purchases/10)*10} pessoas já compraram essa ${info.prod} e adoraram."` : m.purchases > 5 ? `"[Mostrar print de avaliação 5 estrelas de cliente real falando sobre a ${info.prod}]"` : `"[Inserir depoimento real: cliente usando a ${info.prod}, vídeo UGC ou print de avaliação]"`}
-[texto grande na tela + voz]
-
-📣 CTA (25–30s)
-"Aproveita ${m.roi != null && m.roi >= 0 ? '— ainda tem no estoque' : '— link na bio com frete grátis hoje'}, clica aqui embaixo agora."
-[${info.prod} em destaque, urgência visual, botão claro na tela]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 DICAS BASEADAS NAS SUAS MÉTRICAS
-
-${tips[0]}
-
-${tips[1]}`;
-}
-
-async function openScriptModal(c, overallCacArg) {
-  const overallCac = overallCacArg ?? window._overallCac ?? null;
-  $('modal-title').textContent = `Script — ${c.ad_name.substring(0,50)}`;
-  $('modal-body').innerHTML = '<span class="loading">✨ Gerando script…</span>';
-  $('script-modal').classList.add('open');
-
-  // 1. Try Chrome built-in AI (window.ai — Gemini Nano, free, no key)
-  if (window.ai?.languageModel) {
-    try {
-      const m = c.metrics;
-      const info = guessProduct(c.ad_name);
-      const prompt = `Você é especialista em marketing de performance brasileiro.
-Crie um script de vídeo de 30s para este anúncio Meta Ads.
-
-Produto inferido: ${info.prod} | Categoria: ${info.cat}
-Compras: ${m.purchases} | ROI: ${m.roi ?? '—'}% | CAC: R$${m.cac ?? '—'} | Hook Rate: ${m.hookRate ?? '—'}% | CTR: ${m.ctr}%
-
-Use exatamente este formato:
-🎬 HOOK (0–3s): ...
-❗ PROBLEMA (3–8s): ...
-✅ SOLUÇÃO (8–20s): ...
-⭐ PROVA SOCIAL (20–25s): ...
-📣 CTA (25–30s): ...
-
-💡 DICA 1 (baseada nas métricas): ...
-💡 DICA 2: ...`;
-
-      const session = await window.ai.languageModel.create();
-      const result = await session.prompt(prompt);
-      session.destroy();
-      _lastScript = result;
-      $('modal-body').innerHTML = `<div style="white-space:pre-wrap">${result}</div><p style="margin-top:10px;font-size:10px;color:var(--muted)">⚡ Gerado pelo Chrome AI (Gemini Nano — local, gratuito)</p>`;
-      return;
-    } catch(_) { /* fall through to template */ }
-  }
-
-  // 2. Fallback: smart template generator (always works, no API)
-  await new Promise(r => setTimeout(r, 400)); // small delay for UX
-  _lastScript = generateTemplateScript(c, overallCac);
-  $('modal-body').innerHTML = `<div style="white-space:pre-wrap;font-family:monospace;font-size:12px;line-height:1.8">${_lastScript}</div><p style="margin-top:12px;font-size:10px;color:var(--muted)">📊 Script gerado automaticamente com base nas métricas reais do anúncio.</p>`;
-}
-
 const ROI_LABELS = { excellent:'✔ ROI Excelente', good:'✔ ROI Positivo', low:'⚠ ROI Baixo' };
 
 function render(creatives, since, until) {
@@ -960,7 +806,6 @@ function render(creatives, since, until) {
           </div>
           <div style="display:flex;gap:6px;margin-top:2px">
             <button class="btn-script" onclick="openVideoModal(_creatives.find(x=>x.ad_id==='${c.ad_id}'))">▶ Assistir</button>
-            <button class="btn-script" onclick='openScriptModal(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✨ Script</button>
           </div>
         </div>`;
     });
@@ -1002,7 +847,6 @@ function render(creatives, since, until) {
         <td class="td-num">${fmtPct(m.hookRate)}</td>
         <td class="td-num">${fmtPct(m.ctr)}</td>
         <td><span class="rec-badge ${rec.cls}">${rec.label}</span></td>
-        <td><button class="btn-script" onclick="openScriptModal(_creatives[${i}])">✨</button></td>
       </tr>`;
   });
   window._creatives = creatives;
