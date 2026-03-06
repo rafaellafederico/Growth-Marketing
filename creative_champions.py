@@ -66,6 +66,8 @@ def get_top_creatives(ad_account_id: str, since: str, until: str, limit: int = 4
         "action_attribution_windows": json.dumps(["7d_click", "1d_view"]),
     }
     response = requests.get(url, params=params)
+    if not response.ok:
+        print(f"\n[META API ERROR {response.status_code}]\n{response.text}\n")
     response.raise_for_status()
     return response.json().get("data", [])
 
