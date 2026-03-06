@@ -61,7 +61,7 @@ def get_top_creatives(ad_account_id: str, since: str, until: str, limit: int = 4
             "inline_link_clicks",
             "ctr",
         ]),
-        "sort": "actions_purchase:descending",
+        "sort": "spend:descending",
         "limit": limit,
         "action_attribution_windows": json.dumps(["7d_click", "1d_view"]),
     }
