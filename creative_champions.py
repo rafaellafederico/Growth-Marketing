@@ -4,7 +4,6 @@ from datetime import date, timedelta
 
 import requests
 from dotenv import load_dotenv
-import anthropic
 
 load_dotenv()
 
@@ -158,60 +157,245 @@ def _build_summary_lines(creatives: list[dict]) -> list[str]:
     return lines
 
 
-def generate_ai_insights(creatives: list[dict], since: str, until: str) -> None:
-    """Usa Claude Opus 4.6 com adaptive thinking para gerar análise e sugestões."""
-    client = anthropic.Anthropic()
+def _fmt_brl(value: float | None) -> str:
+    return f"R${value:.2f}" if value is not None else "N/A"
 
-    summary = "\n".join(_build_summary_lines(creatives))
+
+def _fmt_pct(value: float | None) -> str:
+    return f"{value:.2f}%" if value is not None else "N/A"
+
+
+def _avg(values: list[float]) -> float | None:
+    vals = [v for v in values if v is not None]
+    return round(sum(vals) / len(vals), 2) if vals else None
+
+
+def generate_ai_insights(creatives: list[dict], since: str, until: str) -> None:
+    """Gera análise completa de criativos com motor local — sem API externa."""
     month_label = date.fromisoformat(since).strftime("%B/%Y")
 
-    prompt = f"""Você é um especialista sênior em Growth Marketing e Media Buying para e-commerce brasileiro.
-
-Analise os TOP {len(creatives)} criativos campeões de {month_label} ({since} a {until}) e entregue um relatório completo:
-
-## 1. RESUMO EXECUTIVO
-Quais padrões explicam a performance destes criativos? O que eles têm em comum?
-
-## 2. ANÁLISE POR FORMATO
-Para cada formato presente (BEST-SELLER, ACAO_PROMOCIONAL, LANCAMENTO, OUTROS):
-- Como o formato performou em média (CAC, ROI, ROAS)?
-- O que funcionou bem?
-- O que pode ser melhorado?
-
-## 3. DESTAQUES DE MÉTRICAS
-- **Melhor CAC**: qual criativo, por que é eficiente e o que podemos aprender?
-- **Melhor ROI**: qual criativo e qual estratégia gerou esse resultado?
-- **Melhor Hook Rate**: o que capturou a atenção do público?
-- **Melhor ROAS**: qual a estratégia por trás desse retorno?
-
-## 4. TOP 5 CRIATIVOS — O QUE PERFORMOU MELHOR
-Liste os 5 melhores com análise detalhada de por que dominaram.
-
-## 5. O QUE PODERIA MELHORAR
-5 sugestões concretas e acionáveis baseadas nos dados.
-
-## 6. RECOMENDAÇÕES PARA O PRÓXIMO MÊS
-O que replicar, o que escalar, o que testar e o que descontinuar.
-
----
-DADOS DOS CRIATIVOS:
-
-{summary}
-"""
-
     print("\n" + "=" * 70)
-    print("  ANÁLISE DE IA — CLAUDE OPUS 4.6 (Adaptive Thinking)")
-    print("=" * 70 + "\n")
+    print(f"  ANÁLISE DE CRIATIVOS CAMPEÕES — {month_label}")
+    print("=" * 70)
 
-    with client.messages.stream(
-        model="claude-opus-4-6",
-        max_tokens=4096,
-        thinking={"type": "adaptive"},
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        for text in stream.text_stream:
-            print(text, end="", flush=True)
-    print("\n")
+    # ── 1. RESUMO EXECUTIVO ───────────────────────────────────────────────
+    total = len(creatives)
+    with_purchases = [c for c in creatives if c["metrics"]["purchases"] > 0]
+    total_spend = sum(c["metrics"]["spend"] for c in creatives)
+    total_revenue = sum(c["metrics"]["purchase_value"] for c in creatives)
+    total_purchases = sum(c["metrics"]["purchases"] for c in creatives)
+    overall_cac = round(total_spend / total_purchases, 2) if total_purchases > 0 else None
+    overall_roi = round(((total_revenue - total_spend) / total_spend) * 100, 2) if total_spend > 0 and total_revenue > 0 else None
+
+    print(f"\n{'─'*70}")
+    print("  1. RESUMO EXECUTIVO")
+    print(f"{'─'*70}")
+    print(f"  Período analisado : {since} → {until}")
+    print(f"  Total criativos   : {total}")
+    print(f"  Com compras       : {len(with_purchases)} ({round(len(with_purchases)/total*100)}%)")
+    print(f"  Investimento total: {_fmt_brl(total_spend)}")
+    print(f"  Receita total     : {_fmt_brl(total_revenue)}")
+    print(f"  Compras totais    : {total_purchases:.0f}")
+    print(f"  CAC médio geral   : {_fmt_brl(overall_cac)}")
+    print(f"  ROI geral         : {_fmt_pct(overall_roi)}")
+
+    # ── 2. ANÁLISE POR FORMATO ────────────────────────────────────────────
+    print(f"\n{'─'*70}")
+    print("  2. ANÁLISE POR FORMATO")
+    print(f"{'─'*70}")
+
+    formats_map: dict[str, list[dict]] = {}
+    for c in creatives:
+        fmt = c["format"]
+        formats_map.setdefault(fmt, []).append(c)
+
+    for fmt, items in sorted(formats_map.items(), key=lambda x: -len(x[1])):
+        m_list = [c["metrics"] for c in items]
+        avg_cac = _avg([m["cac"] for m in m_list])
+        avg_roi = _avg([m["roi"] for m in m_list])
+        avg_roas = _avg([m["roas"] for m in m_list])
+        avg_hook = _avg([m["hook_rate"] for m in m_list])
+        avg_ctr = _avg([m["ctr"] for m in m_list])
+        fmt_purchases = sum(m["purchases"] for m in m_list)
+        fmt_spend = sum(m["spend"] for m in m_list)
+
+        print(f"\n  [{fmt}]  {len(items)} criativos")
+        print(f"    Compras totais : {fmt_purchases:.0f}   |  Investimento: {_fmt_brl(fmt_spend)}")
+        print(f"    CAC médio      : {_fmt_brl(avg_cac)}   |  ROI médio: {_fmt_pct(avg_roi)}")
+        print(f"    ROAS médio     : {avg_roas if avg_roas else 'N/A'}   |  Hook Rate médio: {_fmt_pct(avg_hook)}   |  CTR médio: {_fmt_pct(avg_ctr)}")
+
+        # Diagnóstico automático
+        if avg_roi is not None:
+            if avg_roi >= 200:
+                print(f"    ✔  ROI excelente — formato altamente rentável.")
+            elif avg_roi >= 50:
+                print(f"    ✔  ROI positivo — formato saudável, há espaço para escalar.")
+            else:
+                print(f"    ⚠  ROI baixo — revisar oferta ou público deste formato.")
+        if avg_hook is not None:
+            if avg_hook >= 40:
+                print(f"    ✔  Hook Rate forte — criativos prendem atenção logo no início.")
+            elif avg_hook >= 20:
+                print(f"    ~  Hook Rate moderado — testar variações de abertura.")
+            else:
+                print(f"    ⚠  Hook Rate fraco — primeiros 3 segundos precisam de melhoria.")
+
+    # ── 3. DESTAQUES DE MÉTRICAS ──────────────────────────────────────────
+    print(f"\n{'─'*70}")
+    print("  3. DESTAQUES DE MÉTRICAS")
+    print(f"{'─'*70}")
+
+    def _best(creatives, key, reverse=False):
+        filtered = [c for c in creatives if c["metrics"].get(key) is not None]
+        if not filtered:
+            return None
+        return sorted(filtered, key=lambda c: c["metrics"][key], reverse=not reverse)[0]
+
+    best_cac = _best(creatives, "cac", reverse=True)   # menor CAC = melhor
+    best_roi = _best(creatives, "roi")
+    best_hook = _best(creatives, "hook_rate")
+    best_roas = _best(creatives, "roas")
+    best_purchases = _best(creatives, "purchases")
+
+    highlights = [
+        ("Melhor CAC (menor custo por compra)", best_cac, "cac", _fmt_brl),
+        ("Melhor ROI", best_roi, "roi", _fmt_pct),
+        ("Melhor Hook Rate", best_hook, "hook_rate", _fmt_pct),
+        ("Melhor ROAS", best_roas, "roas", lambda v: str(v) if v else "N/A"),
+        ("Mais Compras", best_purchases, "purchases", lambda v: f"{v:.0f}" if v else "N/A"),
+    ]
+
+    for label, c, key, fmt_fn in highlights:
+        if c:
+            val = fmt_fn(c["metrics"][key])
+            name = c["ad_name"][:55]
+            print(f"\n  {label}: {val}")
+            print(f"    → {name}  [{c['format']}]")
+
+    # ── 4. TOP 5 CRIATIVOS ────────────────────────────────────────────────
+    print(f"\n{'─'*70}")
+    print("  4. TOP 5 CRIATIVOS — O QUE MAIS PERFORMOU")
+    print(f"{'─'*70}")
+
+    # Ordena por compras (principal métrica de resultado)
+    top5 = sorted(creatives, key=lambda c: c["metrics"]["purchases"], reverse=True)[:5]
+    for i, c in enumerate(top5, 1):
+        m = c["metrics"]
+        print(f"\n  #{i} [{c['format']}] {c['ad_name'][:60]}")
+        print(f"      Compras: {m['purchases']:.0f}  |  CAC: {_fmt_brl(m['cac'])}  |  ROI: {_fmt_pct(m['roi'])}  |  ROAS: {m['roas'] if m['roas'] else 'N/A'}")
+        print(f"      Hook Rate: {_fmt_pct(m['hook_rate'])}  |  CTR: {_fmt_pct(m['ctr'])}  |  Spend: {_fmt_brl(m['spend'])}")
+
+        # Por que performou
+        reasons = []
+        if m["cac"] and overall_cac and m["cac"] < overall_cac * 0.8:
+            reasons.append("CAC abaixo da média (eficiente em custo)")
+        if m["roi"] and m["roi"] >= 100:
+            reasons.append(f"ROI de {_fmt_pct(m['roi'])} — alta rentabilidade")
+        if m["hook_rate"] and m["hook_rate"] >= 35:
+            reasons.append("Hook Rate alto — criativo prende atenção")
+        if m["ctr"] and m["ctr"] >= 2.0:
+            reasons.append("CTR forte — anúncio gera cliques qualificados")
+        if reasons:
+            print(f"      Por que performou: {' | '.join(reasons)}")
+
+    # ── 5. O QUE PODERIA MELHORAR ─────────────────────────────────────────
+    print(f"\n{'─'*70}")
+    print("  5. O QUE PODERIA MELHORAR")
+    print(f"{'─'*70}")
+
+    suggestions = []
+
+    # CAC acima da média
+    high_cac = [c for c in creatives if c["metrics"]["cac"] and overall_cac and c["metrics"]["cac"] > overall_cac * 1.3]
+    if high_cac:
+        suggestions.append(
+            f"  {len(high_cac)} criativos com CAC 30%+ acima da média ({_fmt_brl(overall_cac)}). "
+            "Revisar segmentação de público ou oferta nesses anúncios."
+        )
+
+    # Hook Rate baixo
+    low_hook = [c for c in creatives if c["metrics"]["hook_rate"] is not None and c["metrics"]["hook_rate"] < 20]
+    if low_hook:
+        suggestions.append(
+            f"  {len(low_hook)} criativos com Hook Rate < 20%. "
+            "Testar abertura mais direta: mostrar o produto ou resultado nos primeiros 3 segundos."
+        )
+
+    # CTR baixo
+    low_ctr = [c for c in creatives if c["metrics"]["ctr"] < 1.0]
+    if low_ctr:
+        suggestions.append(
+            f"  {len(low_ctr)} criativos com CTR < 1%. "
+            "Revisar CTA, thumbnail ou copy do anúncio — o criativo não está convertendo visualização em clique."
+        )
+
+    # Sem hook rate (provavelmente estático/imagem)
+    no_hook = [c for c in creatives if c["metrics"]["hook_rate"] is None]
+    if no_hook:
+        suggestions.append(
+            f"  {len(no_hook)} criativos sem Hook Rate (provavelmente imagens estáticas). "
+            "Testar versões em vídeo desses criativos — vídeos tendem a ter melhor Hook e CTR."
+        )
+
+    # Formato com ROI negativo
+    for fmt, items in formats_map.items():
+        fmt_spend = sum(c["metrics"]["spend"] for c in items)
+        fmt_revenue = sum(c["metrics"]["purchase_value"] for c in items)
+        if fmt_spend > 0 and fmt_revenue < fmt_spend:
+            suggestions.append(
+                f"  Formato [{fmt}] está com ROI negativo ({_fmt_brl(fmt_revenue)} receita vs {_fmt_brl(fmt_spend)} gasto). "
+                "Considerar pausar ou reformular a abordagem deste formato."
+            )
+
+    if not suggestions:
+        suggestions.append("  Todos os criativos apresentam métricas dentro do esperado. Continue monitorando tendências mês a mês.")
+
+    for s in suggestions:
+        print(s)
+
+    # ── 6. RECOMENDAÇÕES PARA O PRÓXIMO MÊS ──────────────────────────────
+    print(f"\n{'─'*70}")
+    print("  6. RECOMENDAÇÕES PARA O PRÓXIMO MÊS")
+    print(f"{'─'*70}")
+
+    # Melhor formato por ROI
+    best_fmt_roi = None
+    best_fmt_roi_val = None
+    for fmt, items in formats_map.items():
+        rois = [c["metrics"]["roi"] for c in items if c["metrics"]["roi"] is not None]
+        if rois:
+            avg = sum(rois) / len(rois)
+            if best_fmt_roi_val is None or avg > best_fmt_roi_val:
+                best_fmt_roi = fmt
+                best_fmt_roi_val = avg
+
+    print(f"\n  REPLICAR:")
+    if best_fmt_roi:
+        print(f"    • Formato [{best_fmt_roi}] teve o melhor ROI médio ({_fmt_pct(best_fmt_roi_val)}) — aumentar volume de produção deste tipo.")
+    if best_hook:
+        print(f"    • Estrutura de abertura do criativo '{best_hook['ad_name'][:45]}' — Hook Rate {_fmt_pct(best_hook['metrics']['hook_rate'])}.")
+
+    print(f"\n  ESCALAR (aumentar budget):")
+    scale_candidates = [c for c in creatives if c["metrics"]["roi"] and c["metrics"]["roi"] >= 150 and c["metrics"]["purchases"] >= 10]
+    if scale_candidates:
+        for c in scale_candidates[:3]:
+            print(f"    • {c['ad_name'][:55]}  [{c['format']}]  ROI: {_fmt_pct(c['metrics']['roi'])}")
+    else:
+        print("    • Identificar criativos com ROI > 150% e aumentar budget gradualmente (+20% por semana).")
+
+    print(f"\n  TESTAR:")
+    print(f"    • Variações de copy nos top 5 criativos (manter visual, mudar headline).")
+    print(f"    • Formatos ausentes ou com poucos criativos no mix — diversificar.")
+    if low_hook:
+        print(f"    • Abertura em vídeo para os {len(low_hook)} criativos com Hook Rate fraco.")
+
+    print(f"\n  DESCONTINUAR:")
+    if high_cac:
+        print(f"    • {len(high_cac)} criativos com CAC muito acima da média — pausar se não melhorarem em 7 dias.")
+    else:
+        print(f"    • Monitorar criativos com CAC crescente semana a semana — pausar antes de sangrar budget.")
+
+    print(f"\n{'='*70}\n")
 
 
 def print_table(creatives: list[dict]) -> None:
