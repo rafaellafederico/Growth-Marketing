@@ -61,7 +61,7 @@ def get_top_creatives(ad_account_id: str, since: str, until: str, limit: int = 4
             "inline_link_clicks",
             "ctr",
         ]),
-        "sort": "spend:descending",
+        "sort": ["spend_descending"],
         "limit": limit,
     }
     response = requests.get(url, params=params)
