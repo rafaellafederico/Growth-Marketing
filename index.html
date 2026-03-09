@@ -831,21 +831,25 @@ function render(creatives, since, until) {
     collabSec.style.display = 'none';
   }
 
-  // TABELA
+  // TABELA — ordenada por compras desc, desempate por spend
   const tbody = $('table-body');
   tbody.innerHTML = '';
-  creatives.forEach((c, i) => {
+  const sorted = [...creatives].sort((a, b) =>
+    b.metrics.purchases - a.metrics.purchases || b.metrics.spend - a.metrics.spend
+  );
+  sorted.forEach((c, i) => {
     const m = c.metrics;
     const roiClass = m.roi==null?'':m.roi>=100?'good-num':m.roi>=0?'warn-num':'bad-num';
     const cacClass = m.cac==null?'':overallCac&&m.cac<overallCac*0.8?'good-num':overallCac&&m.cac>overallCac*1.3?'bad-num':'';
     const videoHref = c.ig_permalink || (c.video_id
       ? `https://www.facebook.com/video/${c.video_id}`
       : `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${c.ad_id}`);
+    const adId = c.ad_id;
     const previewCell = c.thumbnail
-      ? `<button onclick="openVideoModal(_creatives[${i}])" class="thumb-play" title="Assistir vídeo">
+      ? `<button onclick="openVideoModal(_creatives.find(x=>x.ad_id==='${adId}'))" class="thumb-play" title="Assistir vídeo">
            <img src="${c.thumbnail}" />
          </button>`
-      : `<button onclick="openVideoModal(_creatives[${i}])" title="Ver criativo"
+      : `<button onclick="openVideoModal(_creatives.find(x=>x.ad_id==='${adId}'))" title="Ver criativo"
            style="background:none;border:none;color:var(--accent2);font-size:18px;cursor:pointer">▶</button>`;
     const rec = adRec(c, overallCac);
     const cSafe = JSON.stringify(c).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
