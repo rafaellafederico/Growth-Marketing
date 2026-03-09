@@ -831,15 +831,19 @@ function render(creatives, since, until) {
     collabSec.style.display = 'none';
   }
 
-  // TABELA — score = compras × (1 + ROI%). ROI nulo conta como 0%.
-  // Quem vende muito E é lucrativo fica no topo; ROI negativo penaliza.
-  const perfScore = c => {
-    const roi = c.metrics.roi ?? 0;
-    return c.metrics.purchases * (1 + roi / 100);
-  };
+  // TABELA — ranking por CAC (menor = melhor), mínimo 90 compras no período.
+  // Criativos com < 90 compras ficam no final, ordenados por compras desc.
+  const MIN_PURCHASES = 90;
   const tbody = $('table-body');
   tbody.innerHTML = '';
-  const sorted = [...creatives].sort((a, b) => perfScore(b) - perfScore(a));
+  const sorted = [...creatives].sort((a, b) => {
+    const aOk = a.metrics.purchases >= MIN_PURCHASES && a.metrics.cac != null;
+    const bOk = b.metrics.purchases >= MIN_PURCHASES && b.metrics.cac != null;
+    if (aOk && bOk) return a.metrics.cac - b.metrics.cac;
+    if (aOk) return -1;
+    if (bOk) return 1;
+    return b.metrics.purchases - a.metrics.purchases;
+  });
   sorted.forEach((c, i) => {
     const m = c.metrics;
     const roiClass = m.roi==null?'':m.roi>=100?'good-num':m.roi>=0?'warn-num':'bad-num';
