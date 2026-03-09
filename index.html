@@ -831,12 +831,15 @@ function render(creatives, since, until) {
     collabSec.style.display = 'none';
   }
 
-  // TABELA — ordenada por compras desc, desempate por spend
+  // TABELA — score = compras × (1 + ROI%). ROI nulo conta como 0%.
+  // Quem vende muito E é lucrativo fica no topo; ROI negativo penaliza.
+  const perfScore = c => {
+    const roi = c.metrics.roi ?? 0;
+    return c.metrics.purchases * (1 + roi / 100);
+  };
   const tbody = $('table-body');
   tbody.innerHTML = '';
-  const sorted = [...creatives].sort((a, b) =>
-    b.metrics.purchases - a.metrics.purchases || b.metrics.spend - a.metrics.spend
-  );
+  const sorted = [...creatives].sort((a, b) => perfScore(b) - perfScore(a));
   sorted.forEach((c, i) => {
     const m = c.metrics;
     const roiClass = m.roi==null?'':m.roi>=100?'good-num':m.roi>=0?'warn-num':'bad-num';
